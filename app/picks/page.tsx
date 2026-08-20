@@ -1,14 +1,14 @@
 'use client'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/useAuth'
 import Navbar from '@/components/Navbar'
 import type { Week, Game, Pick } from '@/lib/types'
 
 type WeekWithGames = Week & { games: Game[] }
 
 export default function PicksPage() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
   const [weeks, setWeeks] = useState<WeekWithGames[]>([])
   const [selectedWeek, setSelectedWeek] = useState<WeekWithGames | null>(null)
@@ -18,16 +18,15 @@ export default function PicksPage() {
   const [allocated, setAllocated] = useState(0)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [userData, setUserData] = useState<any>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
   useEffect(() => {
-    if (!session) return
+    if (status !== 'authenticated') return
     fetchData()
-  }, [session])
+  }, [status])
 
   async function fetchData() {
     const [weeksRes, userRes] = await Promise.all([
@@ -36,19 +35,18 @@ export default function PicksPage() {
     ])
     const weeksData: WeekWithGames[] = await weeksRes.json()
     const me = await userRes.json()
-    setUserData(me)
     setRemainingPicks(me?.remaining_picks ?? 0)
 
-    const openWeeks = weeksData.filter(w => w.status === 'open' || w.status === 'closed' || w.status === 'finalized')
-    setWeeks(openWeeks)
-    const current = openWeeks.find(w => w.status === 'open') ?? openWeeks[openWeeks.length - 1]
+    const visible = weeksData.filter(w => w.status !== 'upcoming')
+    setWeeks(visible)
+    const current = visible.find(w => w.status === 'open') ?? visible[visible.length - 1]
     if (current) {
       setSelectedWeek(current)
-      loadPicksForWeek(current.id, me?.remaining_picks ?? 0)
+      loadPicksForWeek(current.id)
     }
   }
 
-  async function loadPicksForWeek(week_id: string, picks: number) {
+  async function loadPicksForWeek(week_id: string) {
     const res = await fetch(`/api/picks?week_id=${week_id}`)
     const data: Pick[] = await res.json()
     setExistingPicks(data)
@@ -57,25 +55,18 @@ export default function PicksPage() {
       init[p.game_id] = { team: p.team_picked, amount: p.picks_wagered }
     }
     setUserPicks(init)
-    const total = data.reduce((s, p) => s + p.picks_wagered, 0)
-    setAllocated(total)
+    setAllocated(data.reduce((s, p) => s + p.picks_wagered, 0))
   }
 
   function setPickTeam(gameId: string, team: string) {
-    setUserPicks(prev => ({
-      ...prev,
-      [gameId]: { team, amount: prev[gameId]?.amount ?? 0 },
-    }))
+    setUserPicks(prev => ({ ...prev, [gameId]: { team, amount: prev[gameId]?.amount ?? 0 } }))
   }
 
   function setPickAmount(gameId: string, amount: number) {
     const prev = userPicks[gameId]
     if (!prev?.team) return
-    const other = Object.entries(userPicks)
-      .filter(([id]) => id !== gameId)
-      .reduce((s, [, v]) => s + (v.amount ?? 0), 0)
-    const max = remainingPicks - other
-    const clamped = Math.min(Math.max(0, amount), max)
+    const other = Object.entries(userPicks).filter(([id]) => id !== gameId).reduce((s, [, v]) => s + (v.amount ?? 0), 0)
+    const clamped = Math.min(Math.max(0, amount), remainingPicks - other)
     const updated = { ...userPicks, [gameId]: { ...prev, amount: clamped } }
     setUserPicks(updated)
     setAllocated(Object.values(updated).reduce((s, v) => s + (v.amount ?? 0), 0))
@@ -91,11 +82,7 @@ export default function PicksPage() {
     setMessage('')
     const picks = Object.entries(userPicks)
       .filter(([, v]) => v.team && v.amount > 0)
-      .map(([game_id, v]) => ({
-        game_id,
-        team_picked: v.team,
-        picks_wagered: v.amount,
-      }))
+      .map(([game_id, v]) => ({ game_id, team_picked: v.team, picks_wagered: v.amount }))
 
     const res = await fetch('/api/picks', {
       method: 'POST',
@@ -106,7 +93,7 @@ export default function PicksPage() {
     setSaving(false)
     if (data.success) {
       setMessage('Picks saved!')
-      loadPicksForWeek(selectedWeek.id, remainingPicks)
+      loadPicksForWeek(selectedWeek.id)
     } else {
       setMessage(data.error ?? 'Error saving picks')
     }
@@ -138,20 +125,11 @@ export default function PicksPage() {
         {weeks.length > 0 && (
           <div className="flex gap-2 mb-6 flex-wrap">
             {weeks.map(w => (
-              <button
-                key={w.id}
-                onClick={() => {
-                  setSelectedWeek(w)
-                  loadPicksForWeek(w.id, remainingPicks)
-                }}
+              <button key={w.id} onClick={() => { setSelectedWeek(w); loadPicksForWeek(w.id) }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                  selectedWeek?.id === w.id
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                Week {w.week_number}
-                {w.status === 'finalized' && ' ✓'}
+                  selectedWeek?.id === w.id ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}>
+                Week {w.week_number}{w.status === 'finalized' && ' ✓'}
               </button>
             ))}
           </div>
@@ -172,22 +150,16 @@ export default function PicksPage() {
                 selectedWeek.status === 'open' ? 'bg-green-900 text-green-300' :
                 selectedWeek.status === 'finalized' ? 'bg-blue-900 text-blue-300' :
                 'bg-red-900 text-red-300'
-              }`}>
-                {selectedWeek.status}
-              </span>
+              }`}>{selectedWeek.status}</span>
             </div>
 
             {canPick && (
               <div className="bg-gray-800 rounded-xl p-3 mb-4 flex items-center gap-3">
                 <div className="flex-1 bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-green-500 h-3 rounded-full transition-all"
-                    style={{ width: `${(allocated / remainingPicks) * 100}%` }}
-                  />
+                  <div className="bg-green-500 h-3 rounded-full transition-all"
+                    style={{ width: `${(allocated / remainingPicks) * 100}%` }} />
                 </div>
-                <span className="text-sm text-gray-300 whitespace-nowrap">
-                  {allocated} / {remainingPicks} allocated
-                </span>
+                <span className="text-sm text-gray-300 whitespace-nowrap">{allocated} / {remainingPicks} allocated</span>
               </div>
             )}
 
@@ -206,53 +178,34 @@ export default function PicksPage() {
                         const isLoser = isFinalized && winner && winner !== team
                         const isSelected = pick?.team === team
                         return (
-                          <button
-                            key={team}
-                            onClick={() => canPick && setPickTeam(game.id, team)}
-                            disabled={!canPick}
+                          <button key={team} onClick={() => canPick && setPickTeam(game.id, team)} disabled={!canPick}
                             className={`flex-1 py-3 rounded-lg font-semibold text-sm transition border-2 ${
                               isWinner ? 'bg-green-800 border-green-500 text-green-200' :
                               isLoser ? 'bg-gray-750 border-gray-600 text-gray-500 line-through' :
                               isSelected ? 'bg-green-700 border-green-500 text-white' :
                               canPick ? 'bg-gray-700 border-gray-600 text-gray-200 hover:border-gray-400' :
                               'bg-gray-700 border-gray-700 text-gray-400 cursor-default'
-                            }`}
-                          >
-                            {team}
-                            {isWinner && ' 🏆'}
+                            }`}>
+                            {team}{isWinner && ' 🏆'}
                           </button>
                         )
                       })}
                     </div>
-
                     {canPick && pick?.team && (
                       <div className="flex items-center gap-3 mt-2">
                         <span className="text-gray-400 text-sm w-28">Picks on {pick.team}:</span>
-                        <button
-                          onClick={() => setPickAmount(game.id, (pick.amount ?? 0) - 1)}
-                          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-bold"
-                        >
-                          -
-                        </button>
+                        <button onClick={() => setPickAmount(game.id, (pick.amount ?? 0) - 1)}
+                          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-bold">-</button>
                         <span className="text-white font-bold w-6 text-center">{pick.amount ?? 0}</span>
-                        <button
-                          onClick={() => setPickAmount(game.id, (pick.amount ?? 0) + 1)}
-                          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-bold"
-                        >
-                          +
-                        </button>
+                        <button onClick={() => setPickAmount(game.id, (pick.amount ?? 0) + 1)}
+                          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-bold">+</button>
                       </div>
                     )}
-
                     {!canPick && existing && (
                       <div className="mt-2 text-sm text-gray-400">
                         {existing.picks_wagered} picks on <span className="text-white font-medium">{existing.team_picked}</span>
                         {' — '}
-                        <span className={
-                          existing.result === 'won' ? 'text-green-400' :
-                          existing.result === 'lost' ? 'text-red-400' :
-                          'text-yellow-400'
-                        }>
+                        <span className={existing.result === 'won' ? 'text-green-400' : existing.result === 'lost' ? 'text-red-400' : 'text-yellow-400'}>
                           {existing.result}
                         </span>
                       </div>
@@ -264,21 +217,12 @@ export default function PicksPage() {
 
             {canPick && (
               <div className="mt-6">
-                {message && (
-                  <p className={`text-sm mb-3 ${message === 'Picks saved!' ? 'text-green-400' : 'text-red-400'}`}>
-                    {message}
-                  </p>
-                )}
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving || allocated !== remainingPicks}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition"
-                >
+                {message && <p className={`text-sm mb-3 ${message === 'Picks saved!' ? 'text-green-400' : 'text-red-400'}`}>{message}</p>}
+                <button onClick={handleSubmit} disabled={saving || allocated !== remainingPicks}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition">
                   {saving ? 'Saving...' : `Submit ${remainingPicks} Picks`}
                 </button>
-                <p className="text-center text-gray-500 text-xs mt-2">
-                  You can re-submit before the deadline if you change your mind
-                </p>
+                <p className="text-center text-gray-500 text-xs mt-2">You can re-submit before the deadline if you change your mind</p>
               </div>
             )}
 

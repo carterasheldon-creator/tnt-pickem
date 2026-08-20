@@ -1,7 +1,7 @@
 'use client'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/useAuth'
 import Navbar from '@/components/Navbar'
 import AdminUsers from './AdminUsers'
 import AdminWeeks from './AdminWeeks'
@@ -10,14 +10,14 @@ import AdminResults from './AdminResults'
 type Tab = 'users' | 'weeks' | 'results'
 
 export default function AdminPage() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('users')
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
-    if (session && !(session.user as any)?.isAdmin) router.push('/')
-  }, [status, session, router])
+    if (status === 'authenticated' && !user?.isAdmin) router.push('/')
+  }, [status, user, router])
 
   if (status === 'loading') return null
 
@@ -29,7 +29,6 @@ export default function AdminPage() {
           <span className="text-3xl">⚙️</span>
           <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
         </div>
-
         <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4">
           {(['users', 'weeks', 'results'] as Tab[]).map(t => (
             <button
@@ -43,7 +42,6 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
-
         {tab === 'users' && <AdminUsers />}
         {tab === 'weeks' && <AdminWeeks />}
         {tab === 'results' && <AdminResults />}

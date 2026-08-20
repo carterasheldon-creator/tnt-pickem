@@ -1,12 +1,12 @@
 'use client'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/useAuth'
 import Navbar from '@/components/Navbar'
 import type { LeaderboardEntry } from '@/lib/types'
 
 export default function LeaderboardPage() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,15 +16,11 @@ export default function LeaderboardPage() {
   }, [status, router])
 
   useEffect(() => {
-    if (!session) return
-    fetch('/api/leaderboard')
-      .then(r => r.json())
-      .then(data => { setEntries(data); setLoading(false) })
-  }, [session])
+    if (status !== 'authenticated') return
+    fetch('/api/leaderboard').then(r => r.json()).then(data => { setEntries(data); setLoading(false) })
+  }, [status])
 
   if (status === 'loading' || loading) return null
-
-  const myName = session?.user?.name
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -34,35 +30,22 @@ export default function LeaderboardPage() {
           <span className="text-3xl">🏆</span>
           <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
         </div>
-
         {entries.length === 0 ? (
-          <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400">
-            No players yet.
-          </div>
+          <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400">No players yet.</div>
         ) : (
           <div className="space-y-3">
             {entries.map((entry, i) => {
               const pct = Math.round((entry.remaining_picks / entry.initial_picks) * 100)
-              const isMe = entry.username === myName
+              const isMe = entry.username === user?.username
               const isEliminated = entry.remaining_picks === 0
-
               return (
-                <div
-                  key={entry.id}
-                  className={`rounded-xl p-4 border transition ${
-                    isMe
-                      ? 'bg-green-900/30 border-green-600'
-                      : isEliminated
-                      ? 'bg-gray-800/50 border-gray-700 opacity-60'
-                      : 'bg-gray-800 border-gray-700'
-                  }`}
-                >
+                <div key={entry.id} className={`rounded-xl p-4 border transition ${
+                  isMe ? 'bg-green-900/30 border-green-600' :
+                  isEliminated ? 'bg-gray-800/50 border-gray-700 opacity-60' : 'bg-gray-800 border-gray-700'
+                }`}>
                   <div className="flex items-center gap-4">
                     <div className={`text-2xl font-bold w-8 text-center ${
-                      i === 0 ? 'text-yellow-400' :
-                      i === 1 ? 'text-gray-300' :
-                      i === 2 ? 'text-amber-600' :
-                      'text-gray-500'
+                      i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-gray-500'
                     }`}>
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                     </div>
@@ -73,10 +56,8 @@ export default function LeaderboardPage() {
                         {isEliminated && <span className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">Eliminated</span>}
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${isEliminated ? 'bg-gray-600' : 'bg-green-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className={`h-2 rounded-full transition-all ${isEliminated ? 'bg-gray-600' : 'bg-green-500'}`}
+                          style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                     <div className="text-right">

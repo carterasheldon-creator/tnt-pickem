@@ -1,12 +1,12 @@
 'use client'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/useAuth'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
 export default function Home() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -14,14 +14,8 @@ export default function Home() {
   }, [status, router])
 
   if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
-      </div>
-    )
+    return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">Loading...</div>
   }
-
-  const isAdmin = (session?.user as any)?.isAdmin
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -31,7 +25,7 @@ export default function Home() {
           <div className="text-6xl mb-4">🏈</div>
           <h1 className="text-4xl font-bold text-white mb-2">TnT Weekly Pick 'Em</h1>
           <p className="text-gray-400 text-lg">
-            Welcome back, <span className="text-green-400 font-semibold">{session?.user?.name}</span>
+            Welcome back, <span className="text-green-400 font-semibold">{user?.username}</span>
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -45,7 +39,7 @@ export default function Home() {
             <h2 className="text-xl font-bold text-white mb-1 group-hover:text-yellow-400">Leaderboard</h2>
             <p className="text-gray-400 text-sm">See who has the most picks remaining this season</p>
           </Link>
-          {isAdmin && (
+          {user?.isAdmin && (
             <Link href="/admin" className="bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-yellow-400 rounded-2xl p-6 transition group md:col-span-2">
               <div className="text-3xl mb-3">⚙️</div>
               <h2 className="text-xl font-bold text-white mb-1 group-hover:text-yellow-400">Admin Panel</h2>

@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -14,15 +13,19 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const res = await signIn('credentials', {
-      username,
-      password,
-      redirect: false,
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     })
-    if (res?.ok) {
+
+    if (res.ok) {
       router.push('/')
+      router.refresh()
     } else {
-      setError('Invalid username or password')
+      const data = await res.json()
+      setError(data.error ?? 'Invalid username or password')
       setLoading(false)
     }
   }

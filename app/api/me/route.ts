@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getSession } from '@/lib/session'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+  const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data, error } = await supabaseAdmin
     .from('users')
     .select('id, username, is_admin, initial_picks, remaining_picks')
-    .eq('username', session.user?.name)
+    .eq('username', session.username)
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
