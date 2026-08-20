@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
+import { authOptions } from '@/lib/auth'
 
 async function requireAdmin() {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions)
   if (!session || !(session.user as any)?.isAdmin) {
     return null
   }
