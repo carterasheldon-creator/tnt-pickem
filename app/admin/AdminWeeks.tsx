@@ -152,6 +152,12 @@ export default function AdminWeeks() {
                     Close Picks
                   </button>
                 )}
+                {selectedWeek.status === 'closed' && (
+                  <button onClick={() => setWeekStatus(selectedWeek.id, 'open')}
+                    className="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded-lg">
+                    Re-open Picks
+                  </button>
+                )}
               </div>
             </div>
             <p className="text-gray-500 text-xs mb-4">

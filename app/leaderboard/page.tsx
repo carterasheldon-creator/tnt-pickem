@@ -22,19 +22,44 @@ export default function LeaderboardPage() {
 
   if (status === 'loading' || loading) return null
 
+  const totalPot = entries.reduce((sum, e) => sum + e.initial_picks, 0) * 10
+
+  // Compute tie-aware ranks: same remaining_picks + total_wins = same rank
+  const ranks = entries.map((entry, i) => {
+    if (i === 0) return 1
+    const prev = entries[i - 1]
+    return (entry.remaining_picks === prev.remaining_picks && entry.total_wins === prev.total_wins)
+      ? -1 // placeholder, resolved below
+      : i + 1
+  })
+  // resolve placeholders back to the rank of the group leader
+  let lastRank = 1
+  const resolvedRanks = ranks.map((r, i) => {
+    if (r !== -1) { lastRank = r; return r }
+    return lastRank
+  })
+
   return (
     <div className="min-h-screen bg-gray-900">
       <Navbar />
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl">🏆</span>
           <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
+        </div>
+        <div className="bg-yellow-900/40 border border-yellow-600 rounded-xl px-5 py-4 mb-6 flex items-center justify-between">
+          <div>
+            <div className="text-yellow-400 text-xs font-semibold uppercase tracking-widest mb-0.5">Total Pot</div>
+            <div className="text-white text-3xl font-bold">${totalPot.toLocaleString()}</div>
+          </div>
+          <span className="text-4xl">💰</span>
         </div>
         {entries.length === 0 ? (
           <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400">No players yet.</div>
         ) : (
           <div className="space-y-3">
             {entries.map((entry, i) => {
+              const rank = resolvedRanks[i]
               const pct = Math.round((entry.remaining_picks / entry.initial_picks) * 100)
               const isMe = entry.username === user?.username
               const isEliminated = entry.remaining_picks === 0
@@ -45,9 +70,9 @@ export default function LeaderboardPage() {
                 }`}>
                   <div className="flex items-center gap-4">
                     <div className={`text-2xl font-bold w-8 text-center ${
-                      i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-gray-500'
+                      rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-gray-300' : rank === 3 ? 'text-amber-600' : 'text-gray-500'
                     }`}>
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                      {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
