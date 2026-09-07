@@ -53,6 +53,66 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
+export async function DELETE(req: NextRequest) {
+  if (!await requireAdmin()) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { week_id } = await req.json()
+
+  // Get all games in this week
+  const { data: games, error: gamesError } = await supabaseAdmin
+    .from('games')
+    .select('id')
+    .eq('week_id', week_id)
+
+  if (gamesError) return NextResponse.json({ error: gamesError.message }, { status: 500 })
+
+  const gameIds = (games ?? []).map(g => g.id)
+
+  if (gameIds.length > 0) {
+    // Find all lost picks so we can restore remaining_picks
+    const { data: lostPicks } = await supabaseAdmin
+      .from('picks')
+      .select('user_id, picks_wagered')
+      .in('game_id', gameIds)
+      .eq('result', 'lost')
+
+    // Restore remaining_picks for each user who had lost picks
+    const restoreMap: Record<string, number> = {}
+    for (const pick of lostPicks ?? []) {
+      restoreMap[pick.user_id] = (restoreMap[pick.user_id] ?? 0) + pick.picks_wagered
+    }
+    for (const [userId, amount] of Object.entries(restoreMap)) {
+      const { data: user } = await supabaseAdmin
+        .from('users')
+        .select('remaining_picks, initial_picks')
+        .eq('id', userId)
+        .single()
+      if (user) {
+        await supabaseAdmin
+          .from('users')
+          .update({ remaining_picks: Math.min(user.initial_picks, user.remaining_picks + amount) })
+          .eq('id', userId)
+      }
+    }
+
+    // Reset all picks in this week back to pending
+    await supabaseAdmin
+      .from('picks')
+      .update({ result: 'pending' })
+      .in('game_id', gameIds)
+
+    // Clear winning_team on all games in this week
+    await supabaseAdmin
+      .from('games')
+      .update({ winning_team: null })
+      .eq('week_id', week_id)
+  }
+
+  return NextResponse.json({ success: true })
+}
+
 export async function PATCH(req: NextRequest) {
   if (!await requireAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

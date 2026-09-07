@@ -69,6 +69,17 @@ export default function AdminWeeks() {
     fetchWeeks()
   }
 
+  async function resetWeek(id: string) {
+    if (!confirm('Reset all game results for this week? This will clear winners, reset all picks to pending, and restore lost pick points.')) return
+    await fetch('/api/admin/results', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week_id: id }),
+    })
+    setMessage('Week results reset.')
+    fetchWeeks()
+  }
+
   async function deleteGame(id: string) {
     await fetch('/api/admin/games', {
       method: 'DELETE',
@@ -158,6 +169,10 @@ export default function AdminWeeks() {
                     Re-open Picks
                   </button>
                 )}
+                <button onClick={() => resetWeek(selectedWeek.id)}
+                  className="text-xs bg-orange-700 hover:bg-orange-600 text-white px-3 py-1 rounded-lg">
+                  Reset Week
+                </button>
               </div>
             </div>
             <p className="text-gray-500 text-xs mb-4">
