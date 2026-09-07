@@ -110,6 +110,12 @@ export async function DELETE(req: NextRequest) {
       .eq('week_id', week_id)
   }
 
+  // Reset week status back to upcoming
+  await supabaseAdmin
+    .from('weeks')
+    .update({ status: 'upcoming' })
+    .eq('id', week_id)
+
   return NextResponse.json({ success: true })
 }
 
