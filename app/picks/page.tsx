@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/useAuth'
 import Navbar from '@/components/Navbar'
 import type { Week, Game, Pick } from '@/lib/types'
+import { formatDeadlineLocal } from '@/lib/time'
 
 type WeekWithGames = Week & { games: Game[] }
 
@@ -141,9 +142,7 @@ export default function PicksPage() {
               <div>
                 <span className="text-gray-400 text-sm">Deadline: </span>
                 <span className="text-white text-sm font-medium">
-                  {new Date(selectedWeek.deadline).toLocaleString('en-US', {
-                    weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-                  })}
+                  {formatDeadlineLocal(selectedWeek.deadline)}
                 </span>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${

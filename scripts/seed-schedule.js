@@ -5,6 +5,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Deadlines below are Arizona wall-clock times (America/Phoenix, fixed UTC-7, no DST).
+// Pin that offset so Postgres stores the correct absolute instant.
+const ARIZONA_UTC_OFFSET = '-07:00'
+const toUtc = local => new Date(`${local}${ARIZONA_UTC_OFFSET}`).toISOString()
+
 const schedule = [
   {
     week_number: 1,
@@ -397,7 +402,7 @@ async function seed() {
       .from('weeks')
       .insert({
         week_number: week.week_number,
-        deadline: week.deadline,
+        deadline: toUtc(week.deadline),
         status: 'upcoming',
       })
       .select()

@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   if (!await requireAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  // `deadline` arrives as a UTC ISO timestamp (converted from Arizona time client-side).
   const { week_number, deadline } = await req.json()
   const { data, error } = await supabaseAdmin
     .from('weeks')
@@ -35,10 +36,17 @@ export async function PATCH(req: NextRequest) {
   if (!await requireAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const { id, status } = await req.json()
+  // `deadline`, when present, is a UTC ISO timestamp (converted from Arizona time client-side).
+  const { id, status, deadline } = await req.json()
+  const update: { status?: string; deadline?: string } = {}
+  if (status !== undefined) update.status = status
+  if (deadline !== undefined) update.deadline = deadline
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
   const { data, error } = await supabaseAdmin
     .from('weeks')
-    .update({ status })
+    .update(update)
     .eq('id', id)
     .select()
     .single()

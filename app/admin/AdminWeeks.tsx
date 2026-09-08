@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import type { Week, Game } from '@/lib/types'
+import { arizonaLocalToUtcIso, utcIsoToArizonaLocal, formatDeadlineArizona } from '@/lib/time'
 
 type WeekWithGames = Week & { games: Game[] }
 
@@ -9,19 +10,27 @@ export default function AdminWeeks() {
   const [selectedWeek, setSelectedWeek] = useState<WeekWithGames | null>(null)
   const [weekNum, setWeekNum] = useState('')
   const [deadline, setDeadline] = useState('')
+  const [deadlineEdit, setDeadlineEdit] = useState('')
   const [homeTeam, setHomeTeam] = useState('')
   const [awayTeam, setAwayTeam] = useState('')
   const [message, setMessage] = useState('')
 
   useEffect(() => { fetchWeeks() }, [])
 
+  // Keep the editable deadline (Arizona wall-clock) in sync with the selected week.
+  useEffect(() => {
+    setDeadlineEdit(selectedWeek ? utcIsoToArizonaLocal(selectedWeek.deadline) : '')
+  }, [selectedWeek?.id, selectedWeek?.deadline])
+
   async function fetchWeeks() {
     const res = await fetch('/api/admin/weeks')
     const data: WeekWithGames[] = await res.json()
     setWeeks(data)
-    if (data.length > 0 && !selectedWeek) {
-      setSelectedWeek(data[data.length - 1])
-    }
+    setSelectedWeek(prev => {
+      if (!prev) return data.length > 0 ? data[data.length - 1] : null
+      // Keep the detail pane in sync with freshly fetched data (status, deadline).
+      return data.find(w => w.id === prev.id) ?? prev
+    })
   }
 
   async function createWeek(e: React.FormEvent) {
@@ -29,7 +38,7 @@ export default function AdminWeeks() {
     const res = await fetch('/api/admin/weeks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ week_number: Number(weekNum), deadline }),
+      body: JSON.stringify({ week_number: Number(weekNum), deadline: arizonaLocalToUtcIso(deadline) }),
     })
     const data = await res.json()
     if (data.id) {
@@ -60,13 +69,39 @@ export default function AdminWeeks() {
     }
   }
 
-  async function setWeekStatus(id: string, status: string) {
-    await fetch('/api/admin/weeks', {
+  async function patchWeek(id: string, body: { status?: string; deadline?: string }) {
+    const res = await fetch('/api/admin/weeks', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ id, ...body }),
     })
-    fetchWeeks()
+    const data = await res.json()
+    await fetchWeeks()
+    return data
+  }
+
+  async function setWeekStatus(id: string, status: string) {
+    await patchWeek(id, { status })
+  }
+
+  // Open (or re-open) a week for picks using the deadline the admin entered.
+  // The datetime-local value is Arizona wall-clock time; convert it to a UTC instant.
+  async function openWeek(id: string) {
+    if (!deadlineEdit) {
+      setMessage('Set a pick deadline before opening the week.')
+      return
+    }
+    const data = await patchWeek(id, { status: 'open', deadline: arizonaLocalToUtcIso(deadlineEdit) })
+    setMessage(data?.error ?? 'Week opened for picks.')
+  }
+
+  async function saveDeadline(id: string) {
+    if (!deadlineEdit) {
+      setMessage('Enter a pick deadline first.')
+      return
+    }
+    const data = await patchWeek(id, { deadline: arizonaLocalToUtcIso(deadlineEdit) })
+    setMessage(data?.error ?? 'Deadline updated.')
   }
 
   async function resetWeek(id: string) {
@@ -148,25 +183,13 @@ export default function AdminWeeks() {
       <div className="md:col-span-2">
         {selectedWeek ? (
           <div className="bg-gray-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-white">Week {selectedWeek.week_number} Games</h2>
               <div className="flex gap-2">
-                {selectedWeek.status === 'upcoming' && (
-                  <button onClick={() => setWeekStatus(selectedWeek.id, 'open')}
-                    className="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded-lg">
-                    Open for Picks
-                  </button>
-                )}
                 {selectedWeek.status === 'open' && (
                   <button onClick={() => setWeekStatus(selectedWeek.id, 'closed')}
                     className="text-xs bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded-lg">
                     Close Picks
-                  </button>
-                )}
-                {selectedWeek.status === 'closed' && (
-                  <button onClick={() => setWeekStatus(selectedWeek.id, 'open')}
-                    className="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded-lg">
-                    Re-open Picks
                   </button>
                 )}
                 <button onClick={() => resetWeek(selectedWeek.id)}
@@ -175,9 +198,35 @@ export default function AdminWeeks() {
                 </button>
               </div>
             </div>
-            <p className="text-gray-500 text-xs mb-4">
-              Deadline: {new Date(selectedWeek.deadline).toLocaleString()} &nbsp;·&nbsp; Status: <span className="text-white">{selectedWeek.status}</span>
-            </p>
+
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4">
+              <label className="text-gray-400 text-xs mb-1 block">
+                Pick Deadline <span className="text-gray-500">(Arizona time — America/Phoenix)</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="datetime-local"
+                  value={deadlineEdit}
+                  onChange={e => setDeadlineEdit(e.target.value)}
+                  className="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm border border-gray-600 focus:outline-none focus:border-yellow-500"
+                />
+                {/* Save the deadline on its own for any week, whatever its status. */}
+                <button onClick={() => saveDeadline(selectedWeek.id)}
+                  className="text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg font-semibold">
+                  {selectedWeek.status === 'open' ? 'Update Deadline' : 'Save Deadline'}
+                </button>
+                {(selectedWeek.status === 'upcoming' || selectedWeek.status === 'closed') && (
+                  <button onClick={() => openWeek(selectedWeek.id)}
+                    className="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-semibold">
+                    {selectedWeek.status === 'closed' ? 'Re-open with this Deadline' : 'Open with this Deadline'}
+                  </button>
+                )}
+              </div>
+              <p className="text-gray-500 text-xs mt-2">
+                Currently locks at {formatDeadlineArizona(selectedWeek.deadline)} Arizona time
+                &nbsp;·&nbsp; Status: <span className="text-white">{selectedWeek.status}</span>
+              </p>
+            </div>
 
             <form onSubmit={addGame} className="flex gap-2 mb-4">
               <input
