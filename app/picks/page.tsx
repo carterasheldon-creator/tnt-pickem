@@ -18,6 +18,7 @@ export default function PicksPage() {
   const [remainingPicks, setRemainingPicks] = useState(0)
   const [allocated, setAllocated] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -57,6 +58,8 @@ export default function PicksPage() {
     }
     setUserPicks(init)
     setAllocated(data.reduce((s, p) => s + p.picks_wagered, 0))
+    setEditing(false)
+    setMessage('')
   }
 
   function setPickTeam(gameId: string, team: string) {
@@ -93,6 +96,7 @@ export default function PicksPage() {
     const data = await res.json()
     setSaving(false)
     if (data.success) {
+      setEditing(false)
       setMessage('Picks saved!')
       loadPicksForWeek(selectedWeek.id)
     } else {
@@ -101,7 +105,9 @@ export default function PicksPage() {
   }
 
   const deadlinePassed = selectedWeek ? new Date() > new Date(selectedWeek.deadline) : false
-  const canPick = selectedWeek?.status === 'open' && !deadlinePassed && remainingPicks > 0
+  const hasSubmitted = existingPicks.length > 0
+  const weekOpenForEdits = selectedWeek?.status === 'open' && !deadlinePassed
+  const canPick = weekOpenForEdits && remainingPicks > 0 && (!hasSubmitted || editing)
 
   if (status === 'loading') return null
 
@@ -151,6 +157,42 @@ export default function PicksPage() {
                 'bg-red-900 text-red-300'
               }`}>{selectedWeek.status}</span>
             </div>
+
+            {hasSubmitted && !editing && (
+              <div className="bg-gray-800 rounded-xl p-4 mb-4 flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <span className="text-green-400 font-semibold">✓ Your picks are in</span>
+                  <span className="text-gray-400">
+                    {' — '}
+                    {weekOpenForEdits
+                      ? 'you can edit until the deadline'
+                      : 'the deadline has passed — picks are locked'}
+                  </span>
+                </div>
+                {weekOpenForEdits && (
+                  <button
+                    onClick={() => { setEditing(true); setMessage('') }}
+                    className="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap"
+                  >
+                    Edit picks
+                  </button>
+                )}
+              </div>
+            )}
+
+            {editing && (
+              <div className="bg-yellow-900/20 border border-yellow-700 rounded-xl p-3 mb-4 flex items-center justify-between gap-3">
+                <span className="text-yellow-300 text-sm">
+                  Editing picks — re-submit before the deadline to save changes.
+                </span>
+                <button
+                  onClick={() => selectedWeek && loadPicksForWeek(selectedWeek.id)}
+                  className="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
 
             {canPick && (
               <div className="bg-gray-800 rounded-xl p-3 mb-4 flex items-center gap-3">

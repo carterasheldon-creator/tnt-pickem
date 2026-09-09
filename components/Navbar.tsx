@@ -22,6 +22,9 @@ export default function Navbar() {
           <Link href="/leaderboard" className={`text-sm ${pathname === '/leaderboard' ? 'text-green-400' : 'text-gray-300 hover:text-white'}`}>
             Leaderboard
           </Link>
+          <Link href="/trends" className={`text-sm ${pathname === '/trends' ? 'text-green-400' : 'text-gray-300 hover:text-white'}`}>
+            Trends
+          </Link>
           {user.isAdmin && (
             <Link href="/admin" className={`text-sm ${pathname.startsWith('/admin') ? 'text-yellow-400' : 'text-gray-300 hover:text-white'}`}>
               Admin

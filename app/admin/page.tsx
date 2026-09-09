@@ -6,8 +6,9 @@ import Navbar from '@/components/Navbar'
 import AdminUsers from './AdminUsers'
 import AdminWeeks from './AdminWeeks'
 import AdminResults from './AdminResults'
+import AdminAllPicks from './AdminAllPicks'
 
-type Tab = 'users' | 'weeks' | 'results'
+type Tab = 'users' | 'weeks' | 'results' | 'allpicks'
 
 export default function AdminPage() {
   const { user, status } = useAuth()
@@ -30,7 +31,7 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
         </div>
         <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4">
-          {(['users', 'weeks', 'results'] as Tab[]).map(t => (
+          {(['users', 'weeks', 'results', 'allpicks'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -38,13 +39,14 @@ export default function AdminPage() {
                 tab === t ? 'bg-yellow-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
               }`}
             >
-              {t === 'users' ? '👥 Users' : t === 'weeks' ? '📅 Weeks & Games' : '🏆 Results'}
+              {t === 'users' ? '👥 Users' : t === 'weeks' ? '📅 Weeks & Games' : t === 'results' ? '🏆 Results' : '📊 All Picks'}
             </button>
           ))}
         </div>
         {tab === 'users' && <AdminUsers />}
         {tab === 'weeks' && <AdminWeeks />}
         {tab === 'results' && <AdminResults />}
+        {tab === 'allpicks' && <AdminAllPicks />}
       </main>
     </div>
   )
