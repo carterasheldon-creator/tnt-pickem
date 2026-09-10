@@ -14,11 +14,11 @@ export default function Home() {
   }, [status, router])
 
   if (status === 'loading') {
-    return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">Loading...</div>
+    return <div className="min-h-screen bg-gray-900/70 flex items-center justify-center text-gray-400">Loading...</div>
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900/70">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-12">

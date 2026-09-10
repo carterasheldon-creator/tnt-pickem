@@ -40,9 +40,9 @@ export default function LeaderboardPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="leaderboard-fans min-h-screen bg-gray-900/70">
       <Navbar />
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl">🏆</span>
           <h1 className="text-2xl font-bold text-white">Leaderboard</h1>

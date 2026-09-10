@@ -20,7 +20,36 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(rgba(3, 7, 18, 0.35), rgba(3, 7, 18, 0.35)),
+    url("/stadium-bg.jpg") center / cover no-repeat fixed;
+  background-color: #030712;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Leaderboard: matching fan cut-outs on the left and right, semi-transparent
+   so the stadium photo behind them still shows through. */
+.leaderboard-fans::before,
+.leaderboard-fans::after {
+  content: "";
+  position: fixed;
+  top: 50%;
+  height: 90vh;
+  width: 640px;
+  max-width: 48vw;
+  background: url("/transparent_no_hands.png") no-repeat center;
+  background-size: contain;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.leaderboard-fans::before {
+  left: 24px;
+  transform: translateY(-50%);
+}
+
+.leaderboard-fans::after {
+  right: 24px;
+  transform: translateY(-50%) scaleX(-1);
 }
